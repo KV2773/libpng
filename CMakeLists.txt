@@ -390,7 +390,7 @@ else(PNG_HARDWARE_OPTIMIZATIONS)
 endif(PNG_HARDWARE_OPTIMIZATIONS)
 
 option(ld-version-script "Enable linker version script" ON)
-if(ld-version-script AND NOT (ANDROID OR APPLE))
+if(ld-version-script AND NOT (ANDROID OR APPLE OR AIX))
   # Check if LD supports linker scripts.
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/conftest.map" "
 VERS_1 { global: sym1; local: *; };
@@ -672,7 +672,15 @@ if(PNG_SHARED)
                                    DEBUG_POSTFIX "${PNG_DEBUG_POSTFIX}"
                                    VERSION "${PNGLIB_SHARED_VERSION}"
                                    SOVERSION "${PNGLIB_ABI_VERSION}")
-  if(UNIX AND AWK)
+  if(CMAKE_SYSTEM_NAME MATCHES "AIX")
+    # AIX: avoid GNU/Solaris version-script flags and rely on an AIX export file.
+    set_target_properties(png_shared
+                          PROPERTIES ENABLE_EXPORTS OFF
+                                     AIX_EXPORT_ALL_SYMBOLS OFF
+                                     LINK_FLAGS "")
+      set_target_properties(png_shared
+                            PROPERTIES LINK_FLAGS "-Wl,-bE:${CMAKE_CURRENT_BINARY_DIR}/libpng.sym")
+  elseif(UNIX AND AWK)
     if(HAVE_LD_VERSION_SCRIPT)
       set_target_properties(png_shared
                             PROPERTIES LINK_FLAGS "-Wl,--version-script='${CMAKE_CURRENT_BINARY_DIR}/libpng.vers'")
@@ -681,6 +689,7 @@ if(PNG_SHARED)
                             PROPERTIES LINK_FLAGS "-Wl,-M -Wl,'${CMAKE_CURRENT_BINARY_DIR}/libpng.vers'")
     endif()
   endif()
+
   if(APPLE)
     # Avoid CMake's implicit compile definition "png_shared_EXPORTS".
     set_target_properties(png_shared
